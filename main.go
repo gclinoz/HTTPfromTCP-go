@@ -7,8 +7,10 @@ import (
 	"log"
 )
 
+const fileName = "./messages.txt"
+
 func main() {
-	f, err := os.Open("./messages.txt")
+	f, err := os.Open(fileName)
 	if err != nil {
 		log.Fatal("Error when opening the file")
 	}
