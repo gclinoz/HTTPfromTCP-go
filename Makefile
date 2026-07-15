@@ -1,7 +1,7 @@
 .PHONY: all clean
 
 all:
-	go build ./cmd/udpsender/
+	go test ./...
 
 clean:
 	rm ./udpsender
