@@ -73,7 +73,3 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	final := &Request{ RequestLine: out }
 	return final, nil
 }
-
-func main() {
-	fmt.Println("to be continued")
-}
