@@ -27,7 +27,7 @@ func main() {
 		fmt.Println("> ")
 		ln, err := rd.ReadString('\n')
 		if err != nil {
-			log.Fatalf("error when reading line: %s\n")
+			log.Fatalf("error when reading line: %s\n", err)
 		}
 		_, err = conn.Write([]byte(ln))
 		if err != nil {
