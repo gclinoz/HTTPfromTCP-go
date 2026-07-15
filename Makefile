@@ -1,7 +1,7 @@
 .PHONY: all clean
 
 all:
-	go build .
+	go build ./cmd/udpsender/
 
 clean:
-	rm ./HTTPfromTCP-go
+	rm ./udpsender
