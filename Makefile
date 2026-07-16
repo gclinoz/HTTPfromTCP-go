@@ -1,7 +1,7 @@
 .PHONY: all clean
 
 all:
-	go test ./...
+	go build ./cmd/tcplistener/
 
 clean:
-	rm ./udpsender
+	rm ./tcplistener
