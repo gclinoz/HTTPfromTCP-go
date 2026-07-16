@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/gclinoz/HTTPfromTCP/internal/request"
+	"github.com/gclinoz/HTTPfromTCP-go/internal/request"
 )
 
 const addr = "127.0.0.1:42069"
@@ -29,9 +29,9 @@ func main() {
 			log.Fatalf("fail reading request")
 		}
 		fmt.Println("Request line:")
-		fmt.Println("- Method: ", data.RequestLine.Method)
-		fmt.Println("- Target: ", data.RequestLine.RequestTarget)
-		fmt.Println("- Version: ", data.RequestLine.HttpVersion)
+		fmt.Println("- Method:", data.RequestLine.Method)
+		fmt.Println("- Target:", data.RequestLine.RequestTarget)
+		fmt.Println("- Version:", data.RequestLine.HttpVersion)
 
 		fmt.Println("Connection closed...")
 	}
