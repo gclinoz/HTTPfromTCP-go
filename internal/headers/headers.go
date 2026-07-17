@@ -45,6 +45,10 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 func (h Headers) Set(key, value string) {
 	key = strings.ToLower(key)
+	existVal, ok := h[key]
+	if ok {
+		value = existVal + "," + value
+	}
 	h[key] = value
 }
 
