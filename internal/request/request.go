@@ -6,17 +6,21 @@ import (
 	"io"
 	"fmt"
 	"strings"
+
+	"github.com/gclinoz/HTTPfromTCP-go/internal/headers"
 )
 
 type StateRequest int
 
 const (
-	INIT StateRequest = iota
-	DONE
+	requestStateInit StateRequest = iota
+	requestStateDone
+	requestStateHead
 )
 
 type Request struct {
 	RequestLine RequestLine
+	Headers		headers.Headers
 	Tracker		StateRequest
 }
 
@@ -34,9 +38,13 @@ const (
 func RequestFromReader(reader io.Reader) (*Request, error) {
 	buf := make([]byte, bufferSize, bufferSize)
 	readToIndex := 0 // keep track of how much data we've read
-	req := &Request{ Tracker: INIT }
+	req := &Request{
+		Headers: headers.NewHeaders(), // program panic without initialize the map
+		Tracker: requestStateInit,
+	}
 
-	for req.Tracker == INIT {
+	// set condition to req.Tracker == requestStateInit is a bug. It will never parse header
+	for req.Tracker != requestStateDone {
 		// if buffer is full, grow it and copy the old data into it
 		if readToIndex >= len(buf) {
 			newbuf := make([]byte, len(buf) * 2)
@@ -48,7 +56,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		n, err := reader.Read(buf[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				req.Tracker = DONE
+				req.Tracker = requestStateDone
 				break
 			}
 			return nil, err
@@ -67,39 +75,63 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 }
 
 func (r *Request) parse(data []byte) (int, error) {
-	switch r.Tracker {
-	case INIT:
-		out, n, err := parseHTTPbyte(data)
+	totalBytesParsed := 0
+	for r.Tracker != requestStateDone {
+		n, err := r.parseSingle(data[totalBytesParsed:])
 		if err != nil {
 			return 0, err
 		}
-		if n == 0 && err == nil {
-			return 0, nil
+		if n == 0 {
+			break // break out the parse loop and read more data
+		}
+		totalBytesParsed += n
+	}
+	return totalBytesParsed, nil
+}
+
+func (r *Request) parseSingle(data []byte) (int, error) {
+	switch r.Tracker {
+	case requestStateInit:
+		out, n, err := parseRequestLine(data)
+		if err != nil {
+			return 0, err
+		}
+		if n == 0 {
+			return 0, nil // need more data
 		}
 		r.RequestLine = *out
-		r.Tracker = DONE
+		r.Tracker = requestStateHead
 		return n, nil
-	case DONE:
+	case requestStateHead:
+		n, done, err := r.Headers.Parse(data)
+		if err != nil {
+			return 0, err
+		}
+		if done {
+			r.Tracker = requestStateDone
+		}
+		return n, nil
+	case requestStateDone:
 		return 0, fmt.Errorf("trying to read data in a done state")
 	default:
 		return 0, fmt.Errorf("unknown state")
 	}
 }
 
-func parseHTTPbyte(data []byte) (*RequestLine, int, error) {
+func parseRequestLine(data []byte) (*RequestLine, int, error) {
 	idx := bytes.Index(data, []byte(crlf))
 	if idx == -1 {
 		return nil, 0, nil
 	}
 	reqText := string(data[:idx])
-	reqLine, err := parseRequestLine(reqText)
+	reqLine, err := parseRequestLineString(reqText)
 	if err != nil {
 		return nil, 0, err
 	}
 	return reqLine, idx + 2, nil
 }
 
-func parseRequestLine(content string) (*RequestLine, error) {
+func parseRequestLineString(content string) (*RequestLine, error) {
 	if content == "" {
 		return nil, fmt.Errorf("empty content")
 	}
