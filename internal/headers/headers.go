@@ -52,6 +52,12 @@ func (h Headers) Set(key, value string) {
 	h[key] = value
 }
 
+func (h Headers) Get(key string) string {
+	key = strings.ToLower(key)
+	existVal, _ := h[key]
+	return existVal
+}
+
 var tokenChars = []byte{'!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~'}
 
 func validTokens(data []byte) bool {

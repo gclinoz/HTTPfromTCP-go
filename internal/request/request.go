@@ -6,6 +6,7 @@ import (
 	"io"
 	"fmt"
 	"strings"
+	"strconv"
 
 	"github.com/gclinoz/HTTPfromTCP-go/internal/headers"
 )
@@ -16,11 +17,13 @@ const (
 	requestStateInit StateRequest = iota
 	requestStateDone
 	requestStateHead
+	requestStateBody
 )
 
 type Request struct {
 	RequestLine RequestLine
 	Headers		headers.Headers
+	Body		[]byte
 	Tracker		StateRequest
 }
 
@@ -33,6 +36,7 @@ type RequestLine struct {
 const (
 	crlf = "\r\n"
 	bufferSize = 8
+	requiredHeaderKey = "Content-Length"
 )
 
 func RequestFromReader(reader io.Reader) (*Request, error) {
@@ -56,6 +60,14 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		n, err := reader.Read(buf[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
+				val := req.Headers.Get(requiredHeaderKey)
+				lenHeader, err := strconv.Atoi(val)
+				if err != nil {
+					return nil, err
+				}
+				if len(req.Body) < lenHeader {
+					return nil, fmt.Errorf("data shorter than content-length header")
+				}
 				req.Tracker = requestStateDone
 				break
 			}
@@ -108,9 +120,29 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 			return 0, err
 		}
 		if done {
-			r.Tracker = requestStateDone
+			r.Tracker = requestStateBody
 		}
 		return n, nil
+	case requestStateBody:
+		val := r.Headers.Get(requiredHeaderKey)
+		if val == "" {
+			r.Tracker = requestStateDone
+			return 0, nil
+		}
+
+		r.Body = append(r.Body, data...)
+
+		lenHeader, err := strconv.Atoi(val)
+		if err != nil {
+			return 0, err
+		}
+		if len(r.Body) > lenHeader {
+			return 0, fmt.Errorf("data longer than content-legnth header")
+		}
+		if len(r.Body) == lenHeader {
+			r.Tracker = requestStateDone
+		}
+		return len(data), nil
 	case requestStateDone:
 		return 0, fmt.Errorf("trying to read data in a done state")
 	default:
