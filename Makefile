@@ -1,7 +1,7 @@
 .PHONY: all clean
 
 all:
-	go test ./...
+	go build ./cmd/httpserver/
 
 clean:
-	rm ./tcplistener
+	rm ./httpserver
