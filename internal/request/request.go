@@ -21,10 +21,11 @@ const (
 )
 
 type Request struct {
-	RequestLine RequestLine
-	Headers		headers.Headers
-	Body		[]byte
-	Tracker		StateRequest
+	RequestLine		RequestLine
+	Headers			headers.Headers
+	Body			[]byte
+	Tracker			StateRequest
+	bodyLengthRead	int
 }
 
 type RequestLine struct {
@@ -43,11 +44,11 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	buf := make([]byte, bufferSize, bufferSize)
 	readToIndex := 0 // keep track of how much data we've read
 	req := &Request{
-		Headers: headers.NewHeaders(), // program panic without initialize the map
-		Tracker: requestStateInit,
+		Headers:	headers.NewHeaders(), // program panic without initialize the map
+		Tracker:	requestStateInit,
+		Body:		make([]byte, 0),
 	}
 
-	// set condition to req.Tracker == requestStateInit is a bug. It will never parse header
 	for req.Tracker != requestStateDone {
 		// if buffer is full, grow it and copy the old data into it
 		if readToIndex >= len(buf) {
@@ -60,15 +61,9 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		n, err := reader.Read(buf[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				val := req.Headers.Get(requiredHeaderKey)
-				lenHeader, err := strconv.Atoi(val)
-				if err != nil {
-					return nil, err
+				if req.Tracker != requestStateDone {
+						return nil, fmt.Errorf("incomplete request, in state: %d, read %d bytes on EOF", req.Tracker, n)
 				}
-				if len(req.Body) < lenHeader {
-					return nil, fmt.Errorf("data shorter than content-length header")
-				}
-				req.Tracker = requestStateDone
 				break
 			}
 			return nil, err
@@ -124,22 +119,23 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 		}
 		return n, nil
 	case requestStateBody:
-		val := r.Headers.Get(requiredHeaderKey)
-		if val == "" {
+		val, ok := r.Headers.Get(requiredHeaderKey)
+		if !ok {
+			// assume that if no content-length, there is no body
 			r.Tracker = requestStateDone
-			return 0, nil
+			return len(data), nil
+		}
+		lenHeader, err := strconv.Atoi(val)
+		if err != nil {
+			return 0, fmt.Errorf("malformed content-length: %s", err)
 		}
 
 		r.Body = append(r.Body, data...)
-
-		lenHeader, err := strconv.Atoi(val)
-		if err != nil {
-			return 0, err
-		}
-		if len(r.Body) > lenHeader {
+		r.bodyLengthRead += len(data)
+		if r.bodyLengthRead > lenHeader {
 			return 0, fmt.Errorf("data longer than content-legnth header")
 		}
-		if len(r.Body) == lenHeader {
+		if r.bodyLengthRead == lenHeader {
 			r.Tracker = requestStateDone
 		}
 		return len(data), nil
