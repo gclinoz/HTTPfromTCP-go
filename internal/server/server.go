@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"sync/atomic"
 	"log"
+
+	"github.com/gclinoz/HTTPfromTCP-go/internal/response"
 )
 
 type Server struct {
@@ -45,14 +47,16 @@ func (s *Server) listen() {
 }
 
 func (s *Server) handle(conn net.Conn) {
-	_, err := conn.Write([]byte(`HTTP/1.1 200 OK
-Content-Type: text/plain
-Content-Length: 13
-
-Hello World!
-`))
+	err := response.WriteStatusLine(conn, response.StatusOK)
 	if err != nil {
-		log.Printf("fail writing response: %s\n", err)
+		log.Printf("fail writing status line: %s\n", err)
 	}
+
+	h := response.GetDefaultHeaders(0)
+	err = response.WriteHeaders(conn, h)
+	if err != nil {
+		log.Printf("fail writing headers: %s\n", err)
+	}
+
 	conn.Close()
 }
