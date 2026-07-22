@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"strings"
 	"slices"
+	"log"
 )
 
 type Headers map[string]string
@@ -48,6 +49,15 @@ func (h Headers) Set(key, value string) {
 	existVal, ok := h[key]
 	if ok {
 		value = existVal + "," + value
+	}
+	h[key] = value
+}
+
+func (h Headers) Replace(key, value string) {
+	key = strings.ToLower(key)
+	_, ok := h[key]
+	if !ok {
+		log.Printf("replacing a non-exist key\n")
 	}
 	h[key] = value
 }

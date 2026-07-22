@@ -15,9 +15,10 @@ type Server struct {
 	listener	net.Listener
 	tracker		atomic.Bool
 	handler		Handler
+	errorer		ErrorHandler
 }
 
-func Serve(port int, hand Handler) (*Server, error) {
+func Serve(port int, hand Handler, erhand ErrorHandler) (*Server, error) {
 	list, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, err
@@ -25,6 +26,7 @@ func Serve(port int, hand Handler) (*Server, error) {
 	s := &Server{
 		listener:	list,
 		handler:	hand,
+		errorer:	erhand,
 	}
 	go s.listen()
 	return s, nil
@@ -52,26 +54,13 @@ func (s *Server) listen() {
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 
+	w := response.NewWriter(conn)
+
 	req, err := request.RequestFromReader(conn)
 	if err != nil {
-		herr := &HandlerError{
-			Status:		response.StatusBad,
-			Message:	err.Error(),
-		}
-		herr.Write(conn)
+		s.errorer(w)
 		return
 	}
 
-	var b bytes.Buffer
-	herr := s.handler(&b, req)
-	if herr != nil {
-		herr.Write(conn)
-		return
-	}
-
-	h := response.GetDefaultHeaders(b.Len())
-	err = response.WriteResp(conn, response.StatusOK, h, b.Bytes())
-	if err != nil {
-		log.Printf("fail writing response: %s\n", err)
-	}
+	s.handler(w, req)
 }

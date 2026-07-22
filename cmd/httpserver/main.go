@@ -31,25 +31,24 @@ func main() {
 	log.Println("Server gracefully stopped")
 }
 
-func handlerTest(w io.Writer, req *request.Request) *server.HandlerError {
-	if req.RequestLine.RequestTarget == "/yourproblem" {
-		return &server.HandlerError{
-			Status:		response.StatusBad,
-			Message:	"Your problem is not my problem\n",
-		}
-	}
-	if req.RequestLine.RequestTarget == "/myproblem" {
-		return &server.HandlerError{
-			Status:		response.StatusError,
-			Message:	"Woopsie, my bad\n",
-		}
-	}
-	_, err := w.Write([]byte("All good, frfr\n"))
-	if err != nil {
-		return &server.HandlerError{
-			Status:		response.StatusError,
-			Message:	"Woopsie, my bad\n",
-		}
-	}
-	return nil
+func handlerTest(w *response.Writer, req *request.Request) {
+	// if req.RequestLine.RequestTarget == "/yourproblem" {
+	// 	return &server.HandlerError{
+	// 		Status:		response.StatusBad,
+	// 		Message:	"Your problem is not my problem\n",
+	// 	}
+	// }
+	// if req.RequestLine.RequestTarget == "/myproblem" {
+	// 	return &server.HandlerError{
+	// 		Status:		response.StatusError,
+	// 		Message:	"Woopsie, my bad\n",
+	// 	}
+	// }
+	// _, err := w.Write([]byte("All good, frfr\n"))
+	// if err != nil {
+	// 	return &server.HandlerError{
+	// 		Status:		response.StatusError,
+	// 		Message:	"Woopsie, my bad\n",
+	// 	}
+	// }
 }
