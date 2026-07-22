@@ -4,7 +4,6 @@ import (
 	"net"
 	"sync/atomic"
 	"log"
-	"bytes"
 	"fmt"
 
 	"github.com/gclinoz/HTTPfromTCP-go/internal/request"

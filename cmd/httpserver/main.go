@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"io"
 
 	"github.com/gclinoz/HTTPfromTCP-go/internal/server"
 	"github.com/gclinoz/HTTPfromTCP-go/internal/request"
@@ -15,7 +14,7 @@ import (
 const port = 42069
 
 func main() {
-	server, err := server.Serve(port, handlerTest)
+	server, err := server.Serve(port, handlerTest, handlerErrorRequest)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
@@ -32,23 +31,36 @@ func main() {
 }
 
 func handlerTest(w *response.Writer, req *request.Request) {
-	// if req.RequestLine.RequestTarget == "/yourproblem" {
-	// 	return &server.HandlerError{
-	// 		Status:		response.StatusBad,
-	// 		Message:	"Your problem is not my problem\n",
-	// 	}
-	// }
-	// if req.RequestLine.RequestTarget == "/myproblem" {
-	// 	return &server.HandlerError{
-	// 		Status:		response.StatusError,
-	// 		Message:	"Woopsie, my bad\n",
-	// 	}
-	// }
-	// _, err := w.Write([]byte("All good, frfr\n"))
-	// if err != nil {
-	// 	return &server.HandlerError{
-	// 		Status:		response.StatusError,
-	// 		Message:	"Woopsie, my bad\n",
-	// 	}
-	// }
+	if req.RequestLine.RequestTarget == "/yourproblem" {
+		handlerErrorRequest(w)
+	}
+
+	if req.RequestLine.RequestTarget == "/myproblem" {
+		handlerErrorInternal(w)
+	}
+
+	h := response.GetDefaultHeaders(len(pass))
+	h.Replace("Content-Type", "text/html")
+	err := w.WriteAll(response.StatusOK, h, []byte(pass))
+	if err != nil {
+		log.Printf("fail to write response: %s", err)
+	}
+}
+
+func handlerErrorRequest(w *response.Writer) {
+	h := response.GetDefaultHeaders(len(bad))
+	h.Replace("Content-Type", "text/html")
+	err := w.WriteAll(response.StatusBad, h, []byte(bad))
+	if err != nil {
+		log.Printf("fail to write response: %s", err)
+	}
+}
+
+func handlerErrorInternal(w *response.Writer) {
+	h := response.GetDefaultHeaders(len(internal))
+	h.Replace("Content-Type", "text/html")
+	err := w.WriteAll(response.StatusError, h, []byte(internal))
+	if err != nil {
+		log.Printf("fail to write response: %s", err)
+	}
 }

@@ -1,9 +1,6 @@
 package server
 
 import (
-	"io"
-	"log"
-
 	"github.com/gclinoz/HTTPfromTCP-go/internal/request"
 	"github.com/gclinoz/HTTPfromTCP-go/internal/response"
 )
