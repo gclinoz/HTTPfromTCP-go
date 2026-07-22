@@ -57,8 +57,17 @@ func WriteHeaders(w io.Writer, headers headers.Headers) error {
 	return nil
 }
 
-func WriteBody(w io.Writer, body []byte) error {
-	_, err := w.Write(body)
+func WriteResp(w io.Writer, statusCode StateCode, headers headers.Headers, body []byte) error {
+	err := WriteStatusLine(w, statusCode)
+	if err != nil {
+		return err
+	}
+	err = WriteHeaders(w, headers)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(body)
+	err = WriteHeaders(w, headers)
 	if err != nil {
 		return err
 	}

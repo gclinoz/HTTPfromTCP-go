@@ -2,6 +2,7 @@ package server
 
 import (
 	"io"
+	"log"
 
 	"github.com/gclinoz/HTTPfromTCP-go/internal/request"
 	"github.com/gclinoz/HTTPfromTCP-go/internal/response"
@@ -14,22 +15,11 @@ type HandlerError struct {
 
 type Handler func(w io.Writer, req *request.Request) *HandlerError
 
-func writeError(w io.Writer, herr *HandlerError) error {
-	err := response.WriteStatusLine(w, herr.Status)
+func (he *HandlerError) Write(w io.Writer) {
+	h := response.GetDefaultHeaders(len(he.Message))
+	b := []byte(he.Message)
+	err := response.WriteResp(w, he.Status, h, b)
 	if err != nil {
-		return err
+		log.Println("Error when writing response")
 	}
-
-	h := response.GetDefaultHeaders(len(herr.Message))
-	err = response.WriteHeaders(w, h)
-	if err != nil {
-		return err
-	}
-
-	b := []byte(herr.Message)
-	err = response.WriteBody(w, b)
-	if err != nil {
-		return err
-	}
-	return nil
 }

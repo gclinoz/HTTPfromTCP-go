@@ -54,31 +54,24 @@ func (s *Server) handle(conn net.Conn) {
 
 	req, err := request.RequestFromReader(conn)
 	if err != nil {
-		log.Printf("fail reading request\n")
+		herr := &HandlerError{
+			Status:		response.StatusBad,
+			Message:	err.Error(),
+		}
+		herr.Write(conn)
+		return
 	}
 
 	var b bytes.Buffer
 	herr := s.handler(&b, req)
 	if herr != nil {
-		err := writeError(conn, herr)
-		if err != nil {
-			log.Printf("fail to write request error\n")
-		}
+		herr.Write(conn)
 		return
 	}
 
 	h := response.GetDefaultHeaders(b.Len())
-
-	err = response.WriteStatusLine(conn, response.StatusOK)
+	err = response.WriteResp(conn, response.StatusOK, h, b.Bytes())
 	if err != nil {
-		log.Printf("fail writing status line: %s\n", err)
-	}
-	err = response.WriteHeaders(conn, h)
-	if err != nil {
-		log.Printf("fail writing headers: %s\n", err)
-	}
-	err = response.WriteBody(conn, b.Bytes())
-	if err != nil {
-		log.Printf("fail writing body: %s\n", err)
+		log.Printf("fail writing response: %s\n", err)
 	}
 }
