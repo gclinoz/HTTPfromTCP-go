@@ -71,6 +71,8 @@ func handlerProxy(w *response.Writer, path string) {
 	}
 	defer resp.Body.Close()
 
+	// add check for response status, if not ok, handle it
+
 	h := response.GetDefaultHeaders(0)
 	h.Del("Content-Length")
 	h.Set("Transfer-Encoding", "chunked")
