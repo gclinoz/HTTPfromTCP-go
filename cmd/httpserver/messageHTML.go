@@ -9,7 +9,8 @@ const (
     <h1>Success!</h1>
     <p>Your request was an absolute banger.</p>
   </body>
-</html>`
+</html>
+`
 
 	bad = `<html>
   <head>
@@ -19,7 +20,8 @@ const (
     <h1>Bad Request</h1>
     <p>Your request honestly kinda sucked.</p>
   </body>
-</html>`
+</html>
+`
 
 	internal = `<html>
   <head>
@@ -29,5 +31,6 @@ const (
     <h1>Internal Server Error</h1>
     <p>Okay, you know what? This one is on me.</p>
   </body>
-</html>`
+</html>
+`
 )

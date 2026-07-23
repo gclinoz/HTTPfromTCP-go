@@ -53,6 +53,10 @@ func (h Headers) Set(key, value string) {
 	h[key] = value
 }
 
+func (h Headers) Del(key string) {
+	delete(h, key)
+}
+
 func (h Headers) Replace(key, value string) {
 	key = strings.ToLower(key)
 	_, ok := h[key]

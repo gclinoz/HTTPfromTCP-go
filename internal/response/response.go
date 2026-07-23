@@ -35,20 +35,20 @@ func NewWriter(conn io.Writer) *Writer {
 	}
 }
 
-func (w *Writer) WriteAll(statusCode StateCode, headers headers.Headers, body []byte) error {
+func (w *Writer) WriteAll(statusCode StateCode, headers headers.Headers, body []byte) (int, error) {
 	err := w.WriteStatusLine(statusCode)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	err = w.WriteHeaders(headers)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	_, err = w.WriteBody(body)
+	n, err := w.WriteBody(body)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	return n, nil
 }
 
 func (w *Writer) WriteStatusLine(statusCode StateCode) error {
@@ -109,5 +109,41 @@ func (w *Writer) WriteBody(p []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	w.writerState = stateStatusLine
+	return n, nil
+}
+
+func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
+	if w.writerState != stateBody {
+		return 0, fmt.Errorf("you are not expecting to write body")
+	}
+
+	size := len(p)
+	chunk := fmt.Sprintf("%x\r\n", size)
+	n1, err := w.pen.Write([]byte(chunk)) // write size in hex followed by carriage return
+	if err != nil {
+		return 0, err
+	}
+	n2, err := w.pen.Write(p) // write chunk data
+	if err != nil {
+		return 0, err
+	}
+	n3, err := w.pen.Write([]byte("\r\n")) // write trailing carriage return
+	if err != nil {
+		return 0, err
+	}
+	return n1 + n2 + n3, nil
+}
+
+func (w *Writer) WriteChunkedBodyDone() (int, error) {
+	if w.writerState != stateBody {
+		return 0, fmt.Errorf("you are not expecting to write body")
+	}
+
+	n, err := w.pen.Write([]byte("0\r\n\r\n")) // write end signal
+	if err != nil {
+		return 0, err
+	}
+	w.writerState = stateStatusLine
 	return n, nil
 }
