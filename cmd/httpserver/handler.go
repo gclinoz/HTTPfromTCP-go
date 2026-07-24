@@ -25,9 +25,14 @@ func handlerMain(w *response.Writer, req *request.Request) {
 		return
 	}
 
-	if strings.HasPrefix(target, "/httpbin") {
+	if strings.HasPrefix(target, "/httpbin/stream") {
 		path:= strings.TrimPrefix(target, "/httpbin")
-		handlerProxy(w, path)
+		handlerProxyStream(w, path)
+		return
+	}
+
+	if strings.HasPrefix(target, "/httpbin/html") {
+		handlerProxy(w)
 		return
 	}
 
@@ -36,7 +41,7 @@ func handlerMain(w *response.Writer, req *request.Request) {
 	n, err := w.WriteAll(response.StatusOK, h, []byte(pass))
 	log.Printf("wrote %d of %d bytes:", n, len(pass))
 	if err != nil {
-		log.Printf("fail to write response: %s", err)
+		log.Printf("fail to write response: %s\n", err)
 	}
 }
 
@@ -46,7 +51,7 @@ func handlerErrorRequest(w *response.Writer) {
 	n, err := w.WriteAll(response.StatusBad, h, []byte(bad))
 	log.Printf("wrote %d of %d bytes:", n, len(bad))
 	if err != nil {
-		log.Printf("fail to write response: %s", err)
+		log.Printf("fail to write response: %s\n", err)
 	}
 }
 
@@ -56,22 +61,26 @@ func handlerErrorInternal(w *response.Writer) {
 	n, err := w.WriteAll(response.StatusError, h, []byte(internal))
 	log.Printf("wrote %d of %d bytes:", n, len(internal))
 	if err != nil {
-		log.Printf("fail to write response: %s", err)
+		log.Printf("fail to write response: %s\n", err)
 	}
 }
 
-func handlerProxy(w *response.Writer, path string) {
+func handlerProxyStream(w *response.Writer, path string) {
 	addr := "https://httpbin.org"
 	URL := addr + path
 	resp, err := http.Get(URL)
 	if err != nil {
-		log.Printf("fail to get content: %s", err)
-		// maybe a handler to notify request httpbin fail?
+		log.Printf("fail to get httpbin content: %s\n", err)
 		return
 	}
 	defer resp.Body.Close()
 
-	// add check for response status, if not ok, handle it
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("httpbin returned status %d\n", resp.StatusCode)
+		w.WriteStatusLine(response.StatusError)
+		w.WriteHeaders(response.GetDefaultHeaders(0))
+		return
+	}
 
 	h := response.GetDefaultHeaders(0)
 	h.Del("Content-Length")
@@ -93,7 +102,7 @@ func handlerProxy(w *response.Writer, path string) {
 		if n > 0 {
 			_, err := w.WriteChunkedBody(buf[:n])
 			if err != nil {
-				log.Printf("error when writing chunk: %s", err)
+				log.Printf("error when writing chunk: %s\n", err)
 				return
 			}
 		}
@@ -101,13 +110,79 @@ func handlerProxy(w *response.Writer, path string) {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			log.Printf("error when reading httpbin response")
+			log.Printf("error when reading httpbin response: %s\n", err)
 			return
 		}
 	}
 
-	_ , err = w.WriteChunkedBodyDone()
+	_, err = w.WriteChunkedBodyDone()
 	if err != nil {
-		log.Printf("fail to terminate chunk write: %s", err)
+		log.Printf("fail to terminate chunk write: %s\n", err)
+	}
+	err = w.WriteTrailers(h)
+	if err != nil {
+		log.Printf("fail to write trailers: %s\n", err)
+	}
+}
+
+func handlerProxy(w *response.Writer) {
+	addr := "https://httpbin.org"
+	URL := addr + "/html"
+	resp, err := http.Get(URL)
+	if err != nil {
+		log.Printf("fail to get httpbin content: %s\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("httpbin returned status %d\n", resp.StatusCode)
+		w.WriteStatusLine(response.StatusError)
+		w.WriteHeaders(response.GetDefaultHeaders(0))
+		return
+	}
+
+	h := response.GetDefaultHeaders(0)
+	h.Del("Content-Length")
+	h.Set("Transfer-Encoding", "chunked")
+	h.Set("Trailer", "X-Content-SHA256")
+	h.Set("Trailer", "X-Content-Length")
+	err = w.WriteStatusLine(response.StatusOK)
+	if err != nil {
+		log.Printf("fail to write status line\n")
+		return
+	}
+	err = w.WriteHeaders(h)
+	if err != nil {
+		log.Printf("fail to write headers\n")
+		return
+	}
+
+	buf := make([]byte, bufSize)
+	for {
+		n, err := resp.Body.Read(buf)
+		if n > 0 {
+			_, err := w.WriteChunkedBody(buf[:n])
+			if err != nil {
+				log.Printf("error when writing chunk: %s\n", err)
+				return
+			}
+		}
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			log.Printf("error when reading httpbin response: %s\n", err)
+			return
+		}
+	}
+
+	_, err = w.WriteChunkedBodyDone()
+	if err != nil {
+		log.Printf("fail to terminate chunk write: %s\n", err)
+	}
+	err = w.WriteTrailers(h)
+	if err != nil {
+		log.Printf("fail to write trailers: %s\n", err)
 	}
 }

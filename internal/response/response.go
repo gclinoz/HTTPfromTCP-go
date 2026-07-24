@@ -4,6 +4,7 @@ import (
 	"io"
 	"fmt"
 	"strconv"
+	"crypto/sha256"
 
 	"github.com/gclinoz/HTTPfromTCP-go/internal/headers"
 )
@@ -27,6 +28,7 @@ const (
 type Writer struct {
 	pen			io.Writer	
 	writerState	writerState
+	bodyByte	[]byte
 }
 
 func NewWriter(conn io.Writer) *Writer {
@@ -120,14 +122,18 @@ func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
 
 	size := len(p)
 	chunk := fmt.Sprintf("%x\r\n", size)
+
 	n1, err := w.pen.Write([]byte(chunk)) // write size in hex followed by carriage return
 	if err != nil {
 		return 0, err
 	}
+
 	n2, err := w.pen.Write(p) // write chunk data
 	if err != nil {
 		return 0, err
 	}
+	w.bodyByte = append(w.bodyByte, p...)
+
 	n3, err := w.pen.Write([]byte("\r\n")) // write trailing carriage return
 	if err != nil {
 		return 0, err
@@ -140,10 +146,32 @@ func (w *Writer) WriteChunkedBodyDone() (int, error) {
 		return 0, fmt.Errorf("you are not expecting to write body")
 	}
 
-	n, err := w.pen.Write([]byte("0\r\n\r\n")) // write end signal
+	n, err := w.pen.Write([]byte("0\r\n")) // write end signal
 	if err != nil {
 		return 0, err
 	}
 	w.writerState = stateStatusLine
 	return n, nil
+}
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	if w.writerState != stateStatusLine {
+		return fmt.Errorf("can not write trailer before termination")
+	}
+
+	_, ok := h.Get("Trailer")
+	if !ok {
+		_, err := w.pen.Write([]byte("\r\n")) // no trailer headers, just terminate
+		if err != nil {
+			return fmt.Errorf("error when writing termination: %s", err)
+		}
+	}
+
+	sum := sha256.Sum256(w.bodyByte)
+	trail := fmt.Sprintf("X-Content-SHA256: %x\r\nX-Content-Length: %d\r\n\r\n", sum, len(w.bodyByte))
+	_, err := w.pen.Write([]byte(trail))
+	if err != nil {
+		return fmt.Errorf("error when writing trailer: %s", err)
+	}
+	return nil
 }
