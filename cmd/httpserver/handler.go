@@ -6,12 +6,16 @@ import (
 	"net/http"
 	"errors"
 	"io"
+	"os"
 
 	"github.com/gclinoz/HTTPfromTCP-go/internal/request"
 	"github.com/gclinoz/HTTPfromTCP-go/internal/response"
 )
 
-const bufSize = 1024
+const (
+	bufSize		= 1024
+	videoPath	= "./assets/vim.mp4"
+)
 
 func handlerMain(w *response.Writer, req *request.Request) {
 	target := req.RequestLine.RequestTarget
@@ -33,6 +37,11 @@ func handlerMain(w *response.Writer, req *request.Request) {
 
 	if strings.HasPrefix(target, "/httpbin/html") {
 		handlerProxy(w)
+		return
+	}
+
+	if strings.HasPrefix(target, "/video") {
+		handlerVideo(w)
 		return
 	}
 
@@ -184,5 +193,19 @@ func handlerProxy(w *response.Writer) {
 	err = w.WriteTrailers(h)
 	if err != nil {
 		log.Printf("fail to write trailers: %s\n", err)
+	}
+}
+
+func handlerVideo(w *response.Writer) {
+	data, err := os.ReadFile(videoPath)
+	if err != nil {
+		log.Printf("error when reading video file: %s\n", err)
+	}
+
+	h := response.GetDefaultHeaders(len(data))
+	h.Replace("Content-Type", "video/mp4")
+	_, err = w.WriteAll(response.StatusOK, h, data)
+	if err != nil {
+		log.Printf("fail to write response: %s\n", err)
 	}
 }
